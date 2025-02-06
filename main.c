@@ -742,6 +742,20 @@ void init_serial(void) {
 	stdio_init_all();
 }
 
+// in radio code see device_info.hpp
+#define CMD_SET_JOY_REPORT_FAR  "fSETJOY-"
+#define JOYC_OFF        "off-"
+void disable_joystick_message_flood()
+{
+    uint8_t id = jcomp_get_next_cmd_id_bradio();
+    JCOMP_CREATE_MSG(cmd_joy_on, JCOMP_MSG_TYPE_COMMAND_EVENT, id, 12);
+
+    jcomp_msg_append_str(cmd_joy_on, CMD_SET_JOY_REPORT_FAR);
+    jcomp_msg_append_str(cmd_joy_on, JOYC_OFF);
+    jcomp_send_msg(cmd_joy_on);
+    // What do do with the rv?
+}
+
 int main(void)
 {
 	gpio_init(BOOTLOADER_ENTRY_PIN);
@@ -763,6 +777,8 @@ int main(void)
 
 	jcomp_init();
 	jcomp_set_env_type("BOOT:" VERSION_TIMESTAMP);
+
+	disable_joystick_message_flood();
 
 	struct cmd_context ctx;
 	uint8_t uart_buf[(sizeof(uint32_t) * (1 + MAX_NARG)) + MAX_DATA_LEN];
