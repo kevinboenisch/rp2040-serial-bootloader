@@ -25,13 +25,14 @@
    Pages are 4k.
    Without USB/stdio 12k was ok
    Without JCOMP 32k was ok.
-   Without JCOMP w/radio changes 40k was ok.  
+   Without JCOMP w/radio changes 40k was ok.
+   After Pico 2.1.1 upgrade, 48k not enough, increased to 52k.
 */
 MEMORY
 {
-    FLASH(rx)             : ORIGIN = 0x10000000,       LENGTH = 48k
+    FLASH(rx)             : ORIGIN = 0x10000000,       LENGTH = 52k
     /* JPO: overwrite user program header */
-    FLASH_USER_HEADER(rx) : ORIGIN = 0x10000000 + 48k, LENGTH = 256
+    FLASH_USER_HEADER(rx) : ORIGIN = 0x10000000 + 52k, LENGTH = 256
 
     RAM(rwx)       : ORIGIN = 0x20000000, LENGTH = 256k
     SCRATCH_X(rwx) : ORIGIN = 0x20040000, LENGTH = 4k
