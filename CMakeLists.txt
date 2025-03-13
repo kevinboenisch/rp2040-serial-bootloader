@@ -99,7 +99,11 @@ set_target_properties(jpo_bootloader PROPERTIES COMPILE_FLAGS "-Wall")
 pico_set_linker_script(jpo_bootloader ${CMAKE_CURRENT_SOURCE_DIR}/bootloader.ld)
 
 target_link_libraries(jpo_bootloader
+                      #pico_stdlib_headers
                       pico_stdlib
+                      pico_multicore
+                      # pico_stdio
+                      hardware_uart
                       hardware_dma
                       hardware_flash
                       hardware_structs
