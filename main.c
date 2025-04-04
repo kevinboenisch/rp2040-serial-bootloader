@@ -33,7 +33,7 @@
 // 1) danilom_bootloader/bootloader.ld
 // 2) jpo-software/resources/build_config/jpo_bootloadable.ld
 // 3) danilom_micropython/ports/rp2/jpo_memmap_mp.ld
-#define BOOTLOADER_SIZE_KB 52
+#define BOOTLOADER_SIZE_KB 56
 
 // The bootloader can be entered in three ways:
 //  - BOOTLOADER_ENTRY_PIN is low

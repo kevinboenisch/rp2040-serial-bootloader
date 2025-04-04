@@ -27,12 +27,14 @@
    Without JCOMP 32k was ok.
    Without JCOMP w/radio changes 40k was ok.
    After Pico 2.1.1 upgrade, 48k not enough, increased to 52k.
+   After radio stuff, increased to 56k.
+   Update: BOOTLOADER_SIZE_KB in c code too
 */
 MEMORY
 {
-    FLASH(rx)             : ORIGIN = 0x10000000,       LENGTH = 52k
+    FLASH(rx)             : ORIGIN = 0x10000000,       LENGTH = 56k
     /* JPO: overwrite user program header */
-    FLASH_USER_HEADER(rx) : ORIGIN = 0x10000000 + 52k, LENGTH = 256
+    FLASH_USER_HEADER(rx) : ORIGIN = 0x10000000 + 56k, LENGTH = 256
 
     RAM(rwx)       : ORIGIN = 0x20000000, LENGTH = 256k
     SCRATCH_X(rwx) : ORIGIN = 0x20040000, LENGTH = 4k
