@@ -28,6 +28,12 @@
 
 #include "stdalign.h"
 
+// Debug enable/disable
+#define T_BOOT NULL // disable
+#define T_TIME "time" // time output at the end of the bootloader. not much overhead, keep enabled.
+
+
+
 // Bootloader size. Must be 4k aligned. 
 // Was 12k originally. Make sure to match:
 // 1) danilom_bootloader/bootloader.ld
@@ -381,7 +387,7 @@ static uint32_t size_store(uint32_t *args_in, uint32_t *data_len_out, uint32_t *
 	uint32_t offset = args_in[0];
 	uint32_t size   = args_in[1];
 
-	//DBG_SEND("size_store offset: %d size: %d", offset, size);
+	//DBG_SEND(T_BOOT, "size_store offset: %d size: %d", offset, size);
 
 	// FLASH_SECTOR_SIZE -- erase size, 4k
 	// FLASH_PAGE_SIZE -- write size, 1k
@@ -402,7 +408,7 @@ static uint32_t handle_store(uint32_t *args_in, uint8_t *data_in, uint32_t *resp
 	uint32_t offset = args_in[0];
 	uint32_t size   = args_in[1];
 
-	//DBG_SEND("handle_store offset: %d size: %d", offset, size);
+	//DBG_SEND(T_BOOT, "handle_store offset: %d size: %d", offset, size);
 
 	if (offset + size > FLASH_SECTOR_SIZE) {
 		// Outside buffer
@@ -428,12 +434,12 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 	uint32_t addr = args_in[0];
 	uint32_t size = args_in[1];
 
-	//DBG_SEND("handle_copyEraseWrite addr: %d size: %d", addr, size);
+	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: %d size: %d", addr, size);
 
-	//DBG_SEND("cewr: do_erase addr: %d size: %d", addr, size);
+	//DBG_SEND(T_BOOT, "cewr: do_erase addr: %d size: %d", addr, size);
 	uint32_t resp = do_erase(addr, size);
 	if (resp != RSP_OK) {
-		DBG_SEND("Error: handle_copyEraseWrite addr: %d size: %d, erase failed.", addr, size);
+		DBG_SEND(T_ERROR, "handle_copyEraseWrite addr: %d size: %d, erase failed.", addr, size);
 		return resp;
 	}
 
@@ -445,7 +451,7 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 			write_size = size - offset;
 		}
 
-		//DBG_SEND("cewr write: addr: %d size: %d offset: %d", addr, write_size, offset);
+		//DBG_SEND(T_BOOT, "cewr write: addr: %d size: %d offset: %d", addr, write_size, offset);
 		do_write(addr + offset, write_size, flash_sector_to_write + offset);
 
 		offset += write_size;
@@ -520,7 +526,7 @@ static uint32_t handle_seal(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_
 
 	// Perf info
 	uint32_t total_ms = time_ms() - _start_ms;
-	DBG_SEND("time (ms): total: %d flash: %d", total_ms, _flash_total_ms);
+	DBG_SEND(T_TIME, "time (ms): total: %d flash: %d", total_ms, _flash_total_ms);
 
 	return RSP_OK;
 }
@@ -594,14 +600,14 @@ static JCOMP_RV read_message(struct cmd_context *ctx, JCOMP_MSG in_msg)
 	pos += size;
 
 	if (err) {
-		DBG_SEND("Error: Failed to read opcode: %d", err);
+		DBG_SEND(T_ERROR, "Failed to read opcode: %d", err);
 		return err;
 	}
 
 	// Read args: state_read_args(ctx)
 	const struct command_desc *desc = find_command_desc(ctx->opcode);
 	if (!desc) {
-		DBG_SEND("Error: Failed to find cmd desc for opcode: %d", ctx->opcode);
+		DBG_SEND(T_ERROR, "Failed to find cmd desc for opcode: %d", ctx->opcode);
 		//X TODO: Error handler that can do args?
 		ctx->status = RSP_ERR;
 		return JCOMP_ERR_BOOTLOADER;
@@ -621,7 +627,7 @@ static JCOMP_RV read_message(struct cmd_context *ctx, JCOMP_MSG in_msg)
 	pos += size;
 
 	if (err) {
-		DBG_SEND("Error: Failed to read args: %d", err);
+		DBG_SEND(T_ERROR, "Failed to read args: %d", err);
 		return err;
 	}
 
@@ -630,7 +636,7 @@ static JCOMP_RV read_message(struct cmd_context *ctx, JCOMP_MSG in_msg)
 	if (desc->size) {
 		ctx->status = desc->size(ctx->args, &ctx->data_len, &ctx->resp_data_len);
 		if (is_error(ctx->status)) {
-			DBG_SEND("Error: Failed to find data size, ctx->status: %d", ctx->status);
+			DBG_SEND(T_ERROR, "Failed to find data size, ctx->status: %d", ctx->status);
 			return JCOMP_ERR_BOOTLOADER;
 		}
 	} else {
@@ -647,7 +653,7 @@ static JCOMP_RV read_message(struct cmd_context *ctx, JCOMP_MSG in_msg)
 	pos += size;
 
 	if (err) {
-		DBG_SEND("Error: Failed to read data: %d", err);
+		DBG_SEND(T_ERROR, "Failed to read data: %d", err);
 		return err;
 	}
 
@@ -657,12 +663,12 @@ static JCOMP_RV read_message(struct cmd_context *ctx, JCOMP_MSG in_msg)
 static JCOMP_RV send_response_core(JCOMP_MSG resp, const uint8_t* payload, size_t len) {
 	JCOMP_RV err = jcomp_msg_set_bytes(resp, 0, payload, len);
 	if (err) {
-		DBG_SEND("Error: Failed to set response bytes: %d", err);
+		DBG_SEND(T_ERROR, "Failed to set response bytes: %d", err);
 		return err;
 	}
 	err = jcomp_send_msg(resp);
 	if (err) {
-		DBG_SEND("Error: Failed to send response: %d", err);
+		DBG_SEND(T_ERROR, "Failed to send response: %d", err);
 		return err;
 	}
 	return JCOMP_OK;
@@ -670,7 +676,7 @@ static JCOMP_RV send_response_core(JCOMP_MSG resp, const uint8_t* payload, size_
 static JCOMP_RV send_response(uint8_t request_id, const uint8_t* payload, size_t len) {
 	JCOMP_CREATE_RESPONSE(resp, request_id, len);
 	if (!resp) {
-		DBG_SEND("Error: Failed to create response");
+		DBG_SEND(T_ERROR, "Failed to create response");
 		return JCOMP_ERR_BOOTLOADER;
 	}
 	JCOMP_RV err = send_response_core(resp, payload, len);
@@ -690,7 +696,7 @@ static JCOMP_RV handle_data(struct cmd_context *ctx, uint8_t request_id)
 	if (desc->handle) {
 		ctx->status = desc->handle(ctx->args, ctx->data, ctx->resp_args, ctx->resp_data);
 		if (is_error(ctx->status)) {
-			DBG_SEND("Error: Failed to handle data, ctx->status: 0x%x", ctx->status);
+			DBG_SEND(T_ERROR, "Failed to handle data, ctx->status: 0x%x", ctx->status);
 			return JCOMP_ERR_BOOTLOADER;
 		}
 	} else {
@@ -717,13 +723,13 @@ static bool should_stay_in_bootloader()
 void process_message(struct cmd_context *ctx, JCOMP_MSG in_msg) {
 	JCOMP_RV err = read_message(ctx, in_msg);
 	if (err) {
-		DBG_SEND("Error: Failed to read message rv: %d", err);
+		DBG_SEND(T_ERROR, "Failed to read message rv: %d", err);
 		send_error(jcomp_msg_id(in_msg));
 		return;
 	}
 	err = handle_data(ctx, jcomp_msg_id(in_msg));
 	if (err) {
-		DBG_SEND("Error: Failed to handle data rv: %d", err);
+		DBG_SEND(T_ERROR, "Failed to handle data rv: %d", err);
 		send_error(jcomp_msg_id(in_msg));
 		return;
 	}
