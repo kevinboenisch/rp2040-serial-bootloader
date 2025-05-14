@@ -39,7 +39,7 @@
 // 1) danilom_bootloader/bootloader.ld
 // 2) jpo-software/resources/build_config/jpo_bootloadable.ld
 // 3) danilom_micropython/ports/rp2/jpo_memmap_mp.ld
-#define BOOTLOADER_SIZE_KB 52
+#define BOOTLOADER_SIZE_KB 60
 
 // The bootloader can be entered in three ways:
 //  - BOOTLOADER_ENTRY_PIN is low
@@ -79,6 +79,10 @@ alignas(4) uint8_t flash_sector_to_write[FLASH_SECTOR_SIZE] = {0};
 // Maximum size in JCOMP, minus bytes for the opcode/addr/len args
 #define MAX_DATA_LEN (JCOMP_MAX_PAYLOAD_SIZE - 12)
 
+// Perf improvement: noack support
+static bool _last_msg_noack = false;
+
+
 // Perf measurement
 static uint32_t _start_ms = 0;
 static uint32_t _flash_total_ms = 0;
@@ -86,6 +90,7 @@ static uint32_t time_ms()
 {
 	return to_ms_since_boot(get_absolute_time());
 }
+
 
 static void disable_interrupts(void)
 {
@@ -591,6 +596,8 @@ static JCOMP_RV read_message(struct cmd_context *ctx, JCOMP_MSG in_msg)
 	uint16_t pos = 0; // position
 	JCOMP_RV err = JCOMP_OK;
 
+	_last_msg_noack = in_msg->type == JCOMP_MSG_TYPE_EVENT_NOACK;
+
 	// Read opcode: state_read_opcode(ctx)
 	//X serial_read_blocking((uint8_t *)&ctx->opcode, sizeof(ctx->opcode));
 	err = jcomp_msg_get_bytes(in_msg, pos, 
@@ -660,7 +667,7 @@ static JCOMP_RV read_message(struct cmd_context *ctx, JCOMP_MSG in_msg)
 	return JCOMP_OK;
 }
 
-static JCOMP_RV send_response_core(JCOMP_MSG resp, const uint8_t* payload, size_t len) {
+static JCOMP_RV send_msg_core(JCOMP_MSG resp, const uint8_t* payload, size_t len) {
 	JCOMP_RV err = jcomp_msg_set_bytes(resp, 0, payload, len);
 	if (err) {
 		DBG_SEND(T_ERROR, "Failed to set response bytes: %d", err);
@@ -674,12 +681,21 @@ static JCOMP_RV send_response_core(JCOMP_MSG resp, const uint8_t* payload, size_
 	return JCOMP_OK;
 }
 static JCOMP_RV send_response(uint8_t request_id, const uint8_t* payload, size_t len) {
-	JCOMP_CREATE_RESPONSE(resp, request_id, len);
+	// Create either a response or a noack event (depending on the last message)
+	uint8_t resp_buf[JCOMP_MSG_BUF_SIZE(len)];
+    JCOMP_MSG resp = NULL;
+	if (_last_msg_noack) {
+		resp = jcomp_create_event_noack(len, resp_buf, sizeof(resp_buf));
+	}
+	else {
+		resp = jcomp_create_response(request_id, len, resp_buf, sizeof(resp_buf));
+	}
+
 	if (!resp) {
 		DBG_SEND(T_ERROR, "Failed to create response");
 		return JCOMP_ERR_BOOTLOADER;
 	}
-	JCOMP_RV err = send_response_core(resp, payload, len);
+	JCOMP_RV err = send_msg_core(resp, payload, len);
 	return err;
 }
 static JCOMP_RV send_error(uint8_t request_id) {
