@@ -52,7 +52,7 @@ pico_sdk_init()
 
 # Build the jpo_bootloader as a standalone thing
 
-add_executable(jpo_bootloader main.c)
+add_executable(jpo_bootloader main.c core1.c)
 
 ###### JPO additions
 # Enable usb output, disable uart output

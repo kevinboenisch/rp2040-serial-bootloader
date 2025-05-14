@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "version.h"
+#include "core1.h"
 
 #include "RP2040.h"
 #include "pico/time.h"
@@ -29,9 +30,8 @@
 #include "stdalign.h"
 
 // Debug enable/disable
-#define T_BOOT NULL // disable
+#define T_BOOT "boot" // TODO: disable
 #define T_TIME "time" // time output at the end of the bootloader. not much overhead, keep enabled.
-
 
 
 // Bootloader size. Must be 4k aligned. 
@@ -75,15 +75,11 @@
 #define ERASE_ADDR_MIN (XIP_BASE + IMAGE_HEADER_OFFSET)
 #define FLASH_ADDR_MAX (XIP_BASE + PICO_FLASH_SIZE_BYTES)
 
-// Page data to write, 4k in size
-alignas(4) uint8_t flash_sector_to_write[FLASH_SECTOR_SIZE] = {0};
-
 // Maximum size in JCOMP, minus bytes for the opcode/addr/len args
 #define MAX_DATA_LEN (JCOMP_MAX_PAYLOAD_SIZE - 12)
 
 // Perf improvement: noack support
 static bool _last_msg_noack = false;
-
 
 // Perf measurement
 static uint32_t _start_ms = 0;
@@ -186,8 +182,10 @@ const struct command_desc cmds[] = {
 		.handle = &handle_store,
 	},
 	{
-		// CEWR addr len
+		// CEWR addr len crc (of the stored buffer)
 		// OKOK crc (of the written page)
+		// CRC! if in-memory data does not match the CRC
+		// ERR! if erase fails
 		.opcode = CMD_CEWR,
 		.nargs = 3,
 		.resp_nargs = 1,
@@ -412,23 +410,25 @@ static uint32_t size_store(uint32_t *args_in, uint32_t *data_len_out, uint32_t *
 
 static uint32_t handle_store(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out)
 {
-	uint32_t offset = args_in[0];
-	uint32_t size   = args_in[1];
+	DBG_SEND(T_ERROR, "handle_store: use core1 handler instead");
 
-	//DBG_SEND(T_BOOT, "handle_store offset: %d size: %d", offset, size);
+	// uint32_t offset = args_in[0];
+	// uint32_t size   = args_in[1];
 
-	if (offset + size > FLASH_SECTOR_SIZE) {
-		// Outside buffer
-		return RSP_ERR;
-	}
+	// DBG_SEND(T_BOOT, "handle_store offset: %d size: %d", offset, size);
 
-	if (offset == 0) {
-		// Clear buffer
-		memset(flash_sector_to_write, 0, FLASH_SECTOR_SIZE);
-	}
+	// if (offset + size > FLASH_SECTOR_SIZE) {
+	// 	// Outside buffer
+	// 	return RSP_ERR;
+	// }
 
-	// Copy data
-	memcpy(flash_sector_to_write + offset, data_in, size);
+	// if (offset == 0) {
+	// 	// Clear buffer
+	// 	memset(flash_sector_to_write, 0, FLASH_SECTOR_SIZE);
+	// }
+
+	// // Copy data
+	// memcpy(flash_sector_to_write + offset, data_in, size);
 
 	// Do not copy, CRC will be returned later
 	return RSP_NO_RESP;
@@ -440,7 +440,11 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 	uint32_t size = args_in[1];
 	uint32_t expected_crc = args_in[2];
 
+	// Page data to write, 4k in size
+	static alignas(4) uint8_t flash_sector_to_write[FLASH_SECTOR_SIZE] = {0};
+
 	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: %d size: %d crc:%d", addr, size, crc);
+	copy_stored_flash_sector(flash_sector_to_write);
 
 	// Verify the CRC of the in-memory data (flash_sector to write)
 	uint32_t mem_crc = calc_crc32(flash_sector_to_write, FLASH_SECTOR_SIZE);
@@ -470,7 +474,7 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 		offset += write_size;
 	}
 	
-	// return CRC of written data (NOT flash_sector_to_write)
+	// return CRC of actual written data (NOT flash_sector_to_write)
 	resp_args_out[0] = calc_crc32((void *)addr, size);
 	
 	return RSP_OK;
@@ -813,6 +817,8 @@ int main(void)
 	jcomp_set_env_type("BOOT:" VERSION_TIMESTAMP);
 
 	disable_joystick_message_flood();
+
+	jcomp_add_core1_handler(core1_store_handler);
 
 	struct cmd_context ctx;
 	uint8_t uart_buf[(sizeof(uint32_t) * (1 + MAX_NARG)) + MAX_DATA_LEN];
