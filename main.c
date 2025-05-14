@@ -61,8 +61,10 @@
 #define CMD_GO     (('G' << 0) | ('O' << 8) | ('G' << 16) | ('O' << 24))
 #define CMD_INFO   (('I' << 0) | ('N' << 8) | ('F' << 16) | ('O' << 24))
 
-#define RSP_OK   (('O' << 0) | ('K' << 8) | ('O' << 16) | ('K' << 24))
-#define RSP_ERR  (('E' << 0) | ('R' << 8) | ('R' << 16) | ('!' << 24))
+#define RSP_OK       (('O' << 0) | ('K' << 8) | ('O' << 16) | ('K' << 24))
+#define RSP_ERR      (('E' << 0) | ('R' << 8) | ('R' << 16) | ('!' << 24))
+#define RSP_ERR_CRC  (('C' << 0) | ('R' << 8) | ('C' << 16) | ('!' << 24))
+#define RSP_NO_RESP (0)
 
 // Bootloader error as a JCOMP_RV value
 #define JCOMP_ERR_BOOTLOADER (JCOMP_ERR_CLIENT + 1)
@@ -187,7 +189,7 @@ const struct command_desc cmds[] = {
 		// CEWR addr len
 		// OKOK crc (of the written page)
 		.opcode = CMD_CEWR,
-		.nargs = 2,
+		.nargs = 3,
 		.resp_nargs = 1,
 		.size = NULL,
 		.handle = &handle_copyEraseWrite,
@@ -428,18 +430,24 @@ static uint32_t handle_store(uint32_t *args_in, uint8_t *data_in, uint32_t *resp
 	// Copy data
 	memcpy(flash_sector_to_write + offset, data_in, size);
 
-	// CRC of the buffer with data written so far
-	resp_args_out[0] = calc_crc32(flash_sector_to_write, FLASH_SECTOR_SIZE);
-
-	return RSP_OK;
+	// Do not copy, CRC will be returned later
+	return RSP_NO_RESP;
 }
 
 static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out)
 {
 	uint32_t addr = args_in[0];
 	uint32_t size = args_in[1];
+	uint32_t expected_crc = args_in[2];
 
-	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: %d size: %d", addr, size);
+	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: %d size: %d crc:%d", addr, size, crc);
+
+	// Verify the CRC of the in-memory data (flash_sector to write)
+	uint32_t mem_crc = calc_crc32(flash_sector_to_write, FLASH_SECTOR_SIZE);
+	if (mem_crc != expected_crc) {
+		DBG_SEND(T_WARN, "handle_copyEraseWrite addr: %d size: %d expected_crc:%d != mem_crc:%d", addr, size, expected_crc, mem_crc);
+		return RSP_ERR_CRC;
+	}
 
 	//DBG_SEND(T_BOOT, "cewr: do_erase addr: %d size: %d", addr, size);
 	uint32_t resp = do_erase(addr, size);
@@ -723,6 +731,11 @@ static JCOMP_RV handle_data(struct cmd_context *ctx, uint8_t request_id)
 	size_t resp_len = sizeof(ctx->status) + (sizeof(*ctx->resp_args) * desc->resp_nargs) + ctx->resp_data_len;
 	memcpy(ctx->uart_buf, &ctx->status, sizeof(ctx->status));
 	
+	// Special case, no response
+	if (ctx->status == RSP_NO_RESP) {
+		return JCOMP_OK;
+	}
+
 	// Send a response
 	JCOMP_RV err = send_response(request_id, ctx->uart_buf, resp_len);
 	return err;
