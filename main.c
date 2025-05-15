@@ -129,8 +129,6 @@ static uint32_t size_csum(uint32_t *args_in, uint32_t *data_len_out, uint32_t *r
 static uint32_t handle_csum(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t size_crc(uint32_t *args_in, uint32_t *data_len_out, uint32_t *resp_data_len_out);
 static uint32_t handle_crc(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
-static uint32_t size_store(uint32_t *args_in, uint32_t *data_len_out, uint32_t *resp_data_len_out);
-static uint32_t handle_store(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t handle_seal(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t handle_go(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
@@ -178,8 +176,8 @@ const struct command_desc cmds[] = {
 		.opcode = CMD_STORE,
 		.nargs = 2,
 		.resp_nargs = 1,
-		.size = &size_store,
-		.handle = &handle_store,
+		.size = NULL,
+		.handle = NULL,
 	},
 	{
 		// CEWR addr len crc (of the stored buffer)
@@ -385,53 +383,6 @@ static void do_write(uint32_t addr, uint32_t size, uint8_t* data_in)
 	uint32_t start_ms = time_ms();
 	flash_range_program(addr - XIP_BASE, data_in, size);
 	_flash_total_ms += time_ms() - start_ms;
-}
-
-static uint32_t size_store(uint32_t *args_in, uint32_t *data_len_out, uint32_t *resp_data_len_out)
-{
-	uint32_t offset = args_in[0];
-	uint32_t size   = args_in[1];
-
-	//DBG_SEND(T_BOOT, "size_store offset: %d size: %d", offset, size);
-
-	// FLASH_SECTOR_SIZE -- erase size, 4k
-	// FLASH_PAGE_SIZE -- write size, 1k
-
-	if (offset + size > FLASH_SECTOR_SIZE) {
-		// Outside buffer
-		return RSP_ERR;
-	}
-
-	*data_len_out = size;
-	*resp_data_len_out = 0;
-
-	return RSP_OK;
-}
-
-static uint32_t handle_store(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out)
-{
-	DBG_SEND(T_ERROR, "handle_store: use core1 handler instead");
-
-	// uint32_t offset = args_in[0];
-	// uint32_t size   = args_in[1];
-
-	// DBG_SEND(T_BOOT, "handle_store offset: %d size: %d", offset, size);
-
-	// if (offset + size > FLASH_SECTOR_SIZE) {
-	// 	// Outside buffer
-	// 	return RSP_ERR;
-	// }
-
-	// if (offset == 0) {
-	// 	// Clear buffer
-	// 	memset(flash_sector_to_write, 0, FLASH_SECTOR_SIZE);
-	// }
-
-	// // Copy data
-	// memcpy(flash_sector_to_write + offset, data_in, size);
-
-	// Do not copy, CRC will be returned later
-	return RSP_NO_RESP;
 }
 
 static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out)
@@ -729,7 +680,7 @@ static JCOMP_RV handle_data(struct cmd_context *ctx, uint8_t request_id)
 			return JCOMP_ERR_BOOTLOADER;
 		}
 	} else {
-		// TODO: Should we just assert(desc->handle)?
+		DBG_SEND(T_ERROR, "No handle function for opcode: 0x%x", ctx->opcode);
 		ctx->status = RSP_OK;
 	}
 
