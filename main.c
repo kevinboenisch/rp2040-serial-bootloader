@@ -30,7 +30,7 @@
 #include "stdalign.h"
 
 // Debug enable/disable
-#define T_BOOT "boot" // TODO: disable
+#define T_BOOT 0 // "boot"
 #define T_TIME "time" // time output at the end of the bootloader. not much overhead, keep enabled.
 
 
@@ -440,23 +440,24 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 	uint32_t size = args_in[1];
 	uint32_t expected_crc = args_in[2];
 
+	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: 0x% xsize: %d expected_crc:0x%x", addr, size, expected_crc);
+
 	// Page data to write, 4k in size
 	static alignas(4) uint8_t flash_sector_to_write[FLASH_SECTOR_SIZE] = {0};
 
-	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: %d size: %d crc:%d", addr, size, crc);
 	copy_stored_flash_sector(flash_sector_to_write);
 
 	// Verify the CRC of the in-memory data (flash_sector to write)
 	uint32_t mem_crc = calc_crc32(flash_sector_to_write, FLASH_SECTOR_SIZE);
 	if (mem_crc != expected_crc) {
-		DBG_SEND(T_WARN, "handle_copyEraseWrite addr: %d size: %d expected_crc:%d != mem_crc:%d", addr, size, expected_crc, mem_crc);
+		DBG_SEND(T_WARN, "handle_copyEraseWrite addr: 0x%x size: %d expected_crc:0x%x != mem_crc:0x%x", addr, size, expected_crc, mem_crc);
 		return RSP_ERR_CRC;
 	}
 
 	//DBG_SEND(T_BOOT, "cewr: do_erase addr: %d size: %d", addr, size);
 	uint32_t resp = do_erase(addr, size);
 	if (resp != RSP_OK) {
-		DBG_SEND(T_ERROR, "handle_copyEraseWrite addr: %d size: %d, erase failed.", addr, size);
+		DBG_SEND(T_ERROR, "handle_copyEraseWrite addr: 0x%x size: %d, erase failed.", addr, size);
 		return resp;
 	}
 
