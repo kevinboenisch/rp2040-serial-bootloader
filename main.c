@@ -78,9 +78,6 @@
 // Maximum size in JCOMP, minus bytes for the opcode/addr/len args
 #define MAX_DATA_LEN (JCOMP_MAX_PAYLOAD_SIZE - 12)
 
-// Perf improvement: noack support
-static bool _last_msg_noack = false;
-
 // Perf measurement
 static uint32_t _start_ms = 0;
 static uint32_t _flash_total_ms = 0;
@@ -560,8 +557,6 @@ static JCOMP_RV read_message(struct cmd_context *ctx, JCOMP_MSG in_msg)
 	uint16_t pos = 0; // position
 	JCOMP_RV err = JCOMP_OK;
 
-	_last_msg_noack = in_msg->type == JCOMP_MSG_TYPE_EVENT_NOACK;
-
 	// Read opcode: state_read_opcode(ctx)
 	//X serial_read_blocking((uint8_t *)&ctx->opcode, sizeof(ctx->opcode));
 	err = jcomp_msg_get_bytes(in_msg, pos, 
@@ -646,15 +641,7 @@ static JCOMP_RV send_msg_core(JCOMP_MSG resp, const uint8_t* payload, size_t len
 }
 static JCOMP_RV send_response(uint8_t request_id, const uint8_t* payload, size_t len) {
 	// Create either a response or a noack event (depending on the last message)
-	uint8_t resp_buf[JCOMP_MSG_BUF_SIZE(len)];
-    JCOMP_MSG resp = NULL;
-	if (_last_msg_noack) {
-		resp = jcomp_create_event_noack(len, resp_buf, sizeof(resp_buf));
-	}
-	else {
-		resp = jcomp_create_response(request_id, len, resp_buf, sizeof(resp_buf));
-	}
-
+	JCOMP_CREATE_EVENT_NOACK(resp, len);
 	if (!resp) {
 		DBG_SEND(T_ERROR, "Failed to create response");
 		return JCOMP_ERR_BOOTLOADER;
