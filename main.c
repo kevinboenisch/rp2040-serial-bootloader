@@ -55,6 +55,7 @@
 #define CMD_READ   (('R' << 0) | ('E' << 8) | ('A' << 16) | ('D' << 24))
 #define CMD_CSUM   (('C' << 0) | ('S' << 8) | ('U' << 16) | ('M' << 24))
 #define CMD_CRC    (('C' << 0) | ('R' << 8) | ('C' << 16) | ('C' << 24))
+#define CMD_ERASE  (('E' << 0) | ('R' << 8) | ('A' << 16) | ('S' << 24))
 #define CMD_STORE  (('S' << 0) | ('T' << 8) | ('O' << 16) | ('R' << 24)) // jpo
 #define CMD_CEWR   (('C' << 0) | ('E' << 8) | ('W' << 16) | ('R' << 24)) // jpo
 #define CMD_SEAL   (('S' << 0) | ('E' << 8) | ('A' << 16) | ('L' << 24))
@@ -74,6 +75,11 @@
 #define WRITE_ADDR_MIN (XIP_BASE + IMAGE_HEADER_OFFSET + FLASH_SECTOR_SIZE)
 #define ERASE_ADDR_MIN (XIP_BASE + IMAGE_HEADER_OFFSET)
 #define FLASH_ADDR_MAX (XIP_BASE + PICO_FLASH_SIZE_BYTES)
+
+// Output PICO_FLASH_SIZE_BYTES at compile time
+#define _STR(x) _VAL(x)
+#define _VAL(x) #x
+#pragma message ("PICO_FLASH_SIZE_BYTES = " _STR(PICO_FLASH_SIZE_BYTES))
 
 // Maximum size in JCOMP, minus bytes for the opcode/addr/len args
 #define MAX_DATA_LEN (JCOMP_MAX_PAYLOAD_SIZE - 12)
@@ -126,6 +132,7 @@ static uint32_t size_csum(uint32_t *args_in, uint32_t *data_len_out, uint32_t *r
 static uint32_t handle_csum(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t size_crc(uint32_t *args_in, uint32_t *data_len_out, uint32_t *resp_data_len_out);
 static uint32_t handle_crc(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
+static uint32_t handle_erase(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t handle_seal(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t handle_go(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
@@ -166,6 +173,15 @@ const struct command_desc cmds[] = {
 		.resp_nargs = 1,
 		.size = &size_crc,
 		.handle = &handle_crc,
+	},
+	{
+		// ERAS addr len
+		// OKOK
+		.opcode = CMD_ERASE,
+		.nargs = 2,
+		.resp_nargs = 0,
+		.size = NULL,
+		.handle = &handle_erase,
 	},
 	{
 		// STOR addr len [data]
@@ -356,6 +372,7 @@ static uint32_t handle_crc(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_a
 	return RSP_OK;
 }
 
+
 static uint32_t do_erase(uint32_t addr, uint32_t size)
 {
 	if ((addr < ERASE_ADDR_MIN) || (addr + size > FLASH_ADDR_MAX)) {
@@ -373,6 +390,14 @@ static uint32_t do_erase(uint32_t addr, uint32_t size)
 	_flash_total_ms += time_ms() - start_ms;
 
 	return RSP_OK;
+}
+
+static uint32_t handle_erase(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out)
+{
+	uint32_t addr = args_in[0];
+	uint32_t size = args_in[1];
+	
+	return do_erase(addr, size);
 }
 
 static void do_write(uint32_t addr, uint32_t size, uint8_t* data_in)
