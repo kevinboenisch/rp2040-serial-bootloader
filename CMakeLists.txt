@@ -24,13 +24,6 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-include(pico_sdk_import.cmake)
-
-project(jpo_bootloader C CXX ASM)
-
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
-
 # Set the board to jpo_brain, in jpo_software repo
 ### Prerequisites
 if (NOT DEFINED ENV{JPO_PATH})
@@ -47,6 +40,14 @@ if (NOT EXISTS "${JPO_BOARD_DIR}")
 endif()
 set(PICO_BOARD_HEADER_DIRS "${JPO_BOARD_DIR}")
 set(PICO_BOARD "jpo_brain")
+
+# Intialize the Pico SDK
+include(pico_sdk_import.cmake)
+
+project(jpo_bootloader C CXX ASM)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
