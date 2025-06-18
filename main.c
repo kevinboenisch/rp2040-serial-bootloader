@@ -750,7 +750,8 @@ void init_serial(void) {
     // NOTE: use the same fix in the JPO bootloader
 
 	// 100 ms is not enough.
-	sleep_ms(200);
+    // 200 ms works most of the time, but is less reliable after BOOTSEL. 
+	sleep_ms(400);
 	stdio_init_all();
 }
 
