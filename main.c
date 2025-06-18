@@ -748,7 +748,9 @@ void init_serial(void) {
 	// It still happens, but with no delay it was happening after every soft (watchdog) reboot. 
 	// see https://www.pivotaltracker.com/story/show/185554935
     // NOTE: use the same fix in the JPO bootloader
-	sleep_ms(500);
+
+	// 100 ms is not enough.
+	sleep_ms(200);
 	stdio_init_all();
 }
 
