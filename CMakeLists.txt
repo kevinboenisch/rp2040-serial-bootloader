@@ -33,6 +33,13 @@ endif()
 file(TO_CMAKE_PATH "$ENV{JPO_PATH}" JPO_PATH)
 message("JPO_PATH (from environment) is ${JPO_PATH}")
 
+# resources
+file(TO_CMAKE_PATH "$ENV{JPO_PATH}/resources" JPO_RES_PATH)
+message("----JPO_PATH/resources is: ${JPO_RES_PATH}")
+if (NOT EXISTS "${JPO_RES_PATH}")
+	message(FATAL_ERROR "Directory JPO_RES_PATH '${JPO_RES_PATH}' does not exist. ${TO_FIX}")
+endif()
+
 # Set board
 set(JPO_BOARD_DIR "${JPO_PATH}/resources/build_config")
 if (NOT EXISTS "${JPO_BOARD_DIR}")
@@ -71,12 +78,14 @@ message("JPO_PATH (from environment) is ${JPO_PATH}")
 
 ### Includes
 target_include_directories(${PROJECT_NAME}
-	PRIVATE "${JPO_PATH}/sdk/jcomp/include"
-	PRIVATE "${JPO_PATH}/sdk/jcomp/protocol/include" # protocol
+	# PRIVATE "${JPO_RES_PATH}/include/hal" # not needed for bootloader
+	PRIVATE "${JPO_RES_PATH}/include/jcomp"
+	PRIVATE "${JPO_RES_PATH}/include/jcomp_protocol" # protocol
 )
+
+# CMake docs recommend using find_library instead, but couldn't get it to work
 target_link_directories(${PROJECT_NAME}
-	PRIVATE "${JPO_PATH}/sdk/build/jcomp"
-	PRIVATE "${JPO_PATH}/sdk/build/jcomp/protocol" # protocol
+	PRIVATE "${JPO_RES_PATH}/lib"
 )
 
 ###### end JPO additions
