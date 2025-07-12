@@ -76,6 +76,7 @@ endif()
 file(TO_CMAKE_PATH "$ENV{JPO_PATH}" JPO_PATH)
 message("JPO_PATH (from environment) is ${JPO_PATH}")
 
+
 ### Includes
 target_include_directories(${PROJECT_NAME}
 	# PRIVATE "${JPO_RES_PATH}/include/hal" # not needed for bootloader
