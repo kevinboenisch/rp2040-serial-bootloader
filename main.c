@@ -25,6 +25,7 @@
 #include "pico/time.h" // Perf measurement
 
 #include "jpo/jcomp/jcomp_protocol.h"
+#include "jpo/jcomp/jcomp_brain.h"
 #include "jpo/jcomp/debug.h"
 
 #include "stdalign.h"
