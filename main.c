@@ -193,12 +193,12 @@ const struct command_desc cmds[] = {
 		.handle = NULL,
 	},
 	{
-		// CEWR addr len crc (of the stored buffer)
+		// CEWR addr len crc (of the stored buffer) progress (0-100)
 		// OKOK crc (of the written page)
 		// CRC! if in-memory data does not match the CRC
 		// ERR! if erase fails
 		.opcode = CMD_CEWR,
-		.nargs = 3,
+		.nargs = 4,
 		.resp_nargs = 1,
 		.size = NULL,
 		.handle = &handle_copyEraseWrite,
@@ -412,6 +412,7 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 	uint32_t addr = args_in[0];
 	uint32_t size = args_in[1];
 	uint32_t expected_crc = args_in[2];
+	uint32_t progress = args_in[3]; // 0-100
 
 	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: 0x% xsize: %d expected_crc:0x%x", addr, size, expected_crc);
 
@@ -451,6 +452,8 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 	// return CRC of actual written data (NOT flash_sector_to_write)
 	resp_args_out[0] = calc_crc32((void *)addr, size);
 	
+	oled_draw_progress_bar(progress);
+
 	return RSP_OK;
 }
 

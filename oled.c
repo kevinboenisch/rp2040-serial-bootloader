@@ -120,19 +120,31 @@ void draw_pattern()
     }
 }
 
-void draw_progress_bar(int percent)
+void oled_draw_progress_bar(int percent)
 {
+    // For perf, do not redraw if not needed
+    static int _cur_filled = -1;
+
+    int row = 0;
+    int width = 16;
+
     // Draw a progress bar at row r, starting at column c.
     // Percent is from 0 to 100.
-    int filled = (percent * 16) / 100; // 16 columns wide
-    for (int i = 0; i < 16; i++) {
+    int filled = (percent * width) / 100; // 16 columns wide
+    if (filled == _cur_filled) {
+        return; // No change, skip redraw
+    }
+    for (int i = 0; i < width; i++) {
         if (i < filled) {
-            WS(0, i, SYMBOL_FILL);
+            WS(row, i, SYMBOL_FILL);
         } else {
-            WS(0, i, SYMBOL_FILL50);
+            WS(row, i, SYMBOL_FILL50);
         }
     }
+    
+    oled_driver_render(&_oled_driver);
 }
+
 
 void oled_start()
 {
