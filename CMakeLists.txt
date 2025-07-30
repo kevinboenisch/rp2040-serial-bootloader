@@ -60,7 +60,11 @@ pico_sdk_init()
 
 # Build the jpo_bootloader as a standalone thing
 
-add_executable(jpo_bootloader main.c core1.c)
+add_executable(jpo_bootloader 
+	main.c 
+	core1.c
+	oled.c
+)
 
 ###### JPO additions
 # Enable usb output, disable uart output
@@ -82,6 +86,7 @@ target_include_directories(${PROJECT_NAME}
 	# PRIVATE "${JPO_RES_PATH}/include/hal" # not needed for bootloader
 	PRIVATE "${JPO_RES_PATH}/include/jcomp"
 	PRIVATE "${JPO_RES_PATH}/include/jcomp_protocol" # protocol
+	PRIVATE "${JPO_RES_PATH}/include/oled"
 )
 
 # CMake docs recommend using find_library instead, but couldn't get it to work
@@ -116,9 +121,11 @@ target_link_libraries(jpo_bootloader
                       hardware_flash
                       hardware_structs
                       hardware_resets
+					  hardware_i2c # for OLED
                       cmsis_core
 					  jpo_jcomp
 					  jpo_jcomp_protocol
+					  jpo_oled
 					  )
 
 set(BOOTLOADER_DIR "${CMAKE_CURRENT_LIST_DIR}" CACHE INTERNAL "")

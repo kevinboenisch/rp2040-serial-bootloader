@@ -8,6 +8,7 @@
 
 #include "version.h"
 #include "core1.h"
+#include "oled.h"
 
 #include "RP2040.h"
 #include "pico/time.h"
@@ -770,6 +771,7 @@ void disable_joystick_message_flood()
     // What do do with the rv?
 }
 
+
 int main(void)
 {
 	gpio_init(BOOTLOADER_ENTRY_PIN);
@@ -791,6 +793,8 @@ int main(void)
 
 	jcomp_init();
 	jcomp_set_env_type("BOOT:" VERSION_TIMESTAMP);
+
+	oled_start();
 
 	disable_joystick_message_flood();
 
