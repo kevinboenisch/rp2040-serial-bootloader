@@ -64,6 +64,8 @@ add_executable(jpo_bootloader
 	main.c 
 	core1.c
 	oled.c
+	oled_indicators.c
+	iic.c
 )
 
 ###### JPO additions
@@ -85,8 +87,9 @@ message("JPO_PATH (from environment) is ${JPO_PATH}")
 target_include_directories(${PROJECT_NAME}
 	# PRIVATE "${JPO_RES_PATH}/include/hal" # not needed for bootloader
 	PRIVATE "${JPO_RES_PATH}/include/jcomp"
-	PRIVATE "${JPO_RES_PATH}/include/jcomp_protocol" # protocol
+	PRIVATE "${JPO_RES_PATH}/include/jcomp_protocol"
 	PRIVATE "${JPO_RES_PATH}/include/oled"
+	PRIVATE "${JPO_RES_PATH}/include/oled_brain_indicators"
 )
 
 # CMake docs recommend using find_library instead, but couldn't get it to work
@@ -121,11 +124,13 @@ target_link_libraries(jpo_bootloader
                       hardware_flash
                       hardware_structs
                       hardware_resets
-					  hardware_i2c # for OLED
                       cmsis_core
 					  jpo_jcomp
 					  jpo_jcomp_protocol
+					  # optional, for oled and indicators
+					  hardware_i2c
 					  jpo_oled
+					  jpo_oled_brain_indicators
 					  )
 
 set(BOOTLOADER_DIR "${CMAKE_CURRENT_LIST_DIR}" CACHE INTERNAL "")

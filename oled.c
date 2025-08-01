@@ -1,9 +1,9 @@
 #include "oled.h"
 
 #include <stdint.h>
-#include "hardware/i2c.h"
-#include "hardware/gpio.h"
 #include "jpo/oled_driver.h"
+#include "oled_indicators.h"
+#include "iic.h"
 
 #include "dino_symbols.h"
 static const uint8_t SYMBOL_FILL50[] = {
@@ -15,29 +15,20 @@ static const uint8_t SYMBOL_FILL[] = {
 
 #define WS(x,y,sym) oled_driver_write_symbol(&_oled_driver, (x), (y), (sym))
 
-// iic
-#define MAIN_I2C i2c0
-#define MAIN_I2C_SDA 4
-#define MAIN_I2C_SCL 5
-#define MAIN_I2C_CLK 400000
-#define OLED_I2C_ADDR 0x3Cu
-static void iic_init()
-{
-    i2c_init(MAIN_I2C, MAIN_I2C_CLK);
-    gpio_set_function(MAIN_I2C_SDA, GPIO_FUNC_I2C);
-    gpio_set_function(MAIN_I2C_SCL, GPIO_FUNC_I2C);
-    gpio_pull_up(MAIN_I2C_SDA);
-    gpio_pull_up(MAIN_I2C_SCL);
-}
-static bool oled_i2c_write(void *data, const uint8_t *src, size_t len)
-{
-    return i2c_write_blocking(MAIN_I2C, OLED_I2C_ADDR, src, len, false) >= 0;
-}
-
 static OLED_VTable_Obj _oled_driver = {
     .i2c_write = oled_i2c_write,
     .inverted = false
 };
+
+bool brain_render_oled()
+{
+#if OLED_INDICATORS_ENABLED
+    return indicators_render(&_oled_driver);
+#else
+    // normal case
+    return oled_driver_render(&_oled_driver);
+#endif
+}
 
 void draw_dino(int r, int c)
 {
@@ -125,39 +116,48 @@ void oled_draw_progress_bar(int percent)
     // For perf, do not redraw if not needed
     static int _cur_filled = -1;
 
-    int row = 0;
-    int width = 16;
-
     // Draw a progress bar at row r, starting at column c.
     // Percent is from 0 to 100.
-    int filled = (percent * width) / 100; // 16 columns wide
+    int filled = (percent * PROGRESS_BAR_WIDTH) / 100; // 16 columns wide
     if (filled == _cur_filled) {
         return; // No change, skip redraw
     }
-    for (int i = 0; i < width; i++) {
+    for (int i = 0; i < PROGRESS_BAR_WIDTH; i++) {
         if (i < filled) {
-            WS(row, i, SYMBOL_FILL);
+            WS(PROGRESS_BAR_ROW, i, SYMBOL_FILL);
         } else {
-            WS(row, i, SYMBOL_FILL50);
+            WS(PROGRESS_BAR_ROW, i, SYMBOL_FILL50);
         }
     }
-    
-    oled_driver_render(&_oled_driver);
-}
 
+    brain_render_oled();
+}
 
 void oled_start()
 {
+    static bool oled_initialized = false;
+    if (oled_initialized)
+    {
+        return;
+    }
+
     // Initialize main I2C bus.
     iic_init();
 
     oled_driver_init(&_oled_driver);
-    oled_driver_clear(&_oled_driver);
 
+#if OLED_INDICATORS_ENABLED
+    indicators_add();
+#endif
+
+    oled_initialized = true;
+    oled_driver_clear(&_oled_driver);
+    
     draw_dino(2, 3);
     //draw_big_b(2, 3);
     //draw_pattern();
     //draw_progress_bar(0);
 
-    oled_driver_render(&_oled_driver);
+    brain_render_oled();
 }
+
