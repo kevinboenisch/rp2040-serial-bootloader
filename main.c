@@ -417,8 +417,7 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: 0x% xsize: %d expected_crc:0x%x", addr, size, expected_crc);
 
 	// Page data to write, 4k in size
-	static alignas(4) uint8_t flash_sector_to_write[FLASH_SECTOR_SIZE] = {0};
-
+	alignas(4) uint8_t flash_sector_to_write[FLASH_SECTOR_SIZE] = {0};
 	copy_stored_flash_sector(flash_sector_to_write);
 
 	// Verify the CRC of the in-memory data (flash_sector to write)
@@ -777,6 +776,13 @@ void disable_joystick_message_flood()
 
 int main(void)
 {
+	// Binary size optimization (keep buffers in RAM to save flash space)
+	// !! DO NOT MOVE/REFACTOR !! 
+	// MUST BE IN main(), on top of the stack.
+	alignas(4) uint8_t stored_flash_sector[FLASH_SECTOR_SIZE] = {0};
+	core1_init_stored_flash_sector(stored_flash_sector);
+
+
 	gpio_init(BOOTLOADER_ENTRY_PIN);
 	gpio_pull_up(BOOTLOADER_ENTRY_PIN);
 	gpio_set_dir(BOOTLOADER_ENTRY_PIN, 0);

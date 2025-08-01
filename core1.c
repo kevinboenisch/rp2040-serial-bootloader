@@ -17,7 +17,13 @@
 auto_init_mutex(_state_mutex);
 
 // Page data to write, 4k in size
-static alignas(4) uint8_t _stored_flash_sector[FLASH_SECTOR_SIZE] = {0};
+// Optimization: initialize in main() to keep it in RAM (top of the stack) instead of the binary (flash)
+static uint8_t* _stored_flash_sector = NULL;
+
+void core1_init_stored_flash_sector(uint8_t* data)
+{
+    _stored_flash_sector = data;
+}
 
 static void handle_store(const JCOMP_MSG msg)
 {
@@ -36,7 +42,7 @@ static void handle_store(const JCOMP_MSG msg)
 	}
 
     mutex_enter_blocking(&_state_mutex);
-
+    
 	if (offset == 0) {
 		// Clear buffer
 		memset(_stored_flash_sector, 0, FLASH_SECTOR_SIZE);
