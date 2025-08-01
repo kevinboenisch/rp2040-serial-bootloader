@@ -10,6 +10,7 @@
 #include "jpo/oled_brain_indicators.h"
 #include "jpo/jcomp/core1.h"
 #include "pico/mutex.h"
+#include "jpo/jcomp/debug.h"
 
 #define INDICATOR_UPDATE_MS 1000
 static OLED_VTable _indicators_driver = NULL;
@@ -28,6 +29,12 @@ static void update_indicators_handler()
 
 void indicators_add()
 {
+    if (!_indicators_driver) 
+    {
+        DBG_SEND(T_ERROR, "Indicators driver not initialized");
+        return;
+    }
+
     oled_indicator_register(oi_draw_radio_status_w1, 1);
     oled_indicator_register(oi_draw_usbhost_status_w1, 1);
     oled_indicator_register(oi_draw_rs485_status_w1, 1);
@@ -40,13 +47,21 @@ void indicators_add()
 bool indicators_render(OLED_VTable oled_driver)
 {
     mutex_enter_blocking(&_indicators_mutex);
+    bool done = false;
 
-    // "commit" the user buffer to the overlay buffer
-    oled_indicators_copy_buffer(_indicators_driver, oled_driver);
+    if (!_indicators_driver) 
+    {
+        DBG_SEND(T_ERROR, "Indicators driver not initialized");
+    }
+    else 
+    {
+        // "commit" the user buffer to the overlay buffer
+        oled_indicators_copy_buffer(_indicators_driver, oled_driver);
 
-    // Force a redraw, since user's buffer might have overwritten the indicators area.
-    oled_indicators_draw(_indicators_driver, true);
-    bool done = oled_driver_render(_indicators_driver);
+        // Force a redraw, since user's buffer might have overwritten the indicators area.
+        oled_indicators_draw(_indicators_driver, true);
+        done = oled_driver_render(_indicators_driver);
+    }
 
     mutex_exit(&_indicators_mutex);
     return done;

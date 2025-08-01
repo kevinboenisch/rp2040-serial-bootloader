@@ -806,11 +806,12 @@ int main(void)
 	jcomp_init();
 	jcomp_set_env_type("BOOT:" VERSION_TIMESTAMP);
 
+#if OLED_INDICATORS_ENABLED
+	// Should be done before oled_init(), as the latter clears the screen and renders indicators 
+	indicators_init(&indicators_driver);
+#endif
 #if OLED_ENABLED
 	oled_init(&oled_driver);
-#endif
-#if OLED_INDICATORS_ENABLED
-	indicators_init(&indicators_driver);
 #endif
 
 	disable_joystick_message_flood();

@@ -11,4 +11,4 @@
 #define OLED_ENABLED (1)
 
 // OLED indicators enabled
-#define OLED_INDICATORS_ENABLED (0)
+#define OLED_INDICATORS_ENABLED (1)
