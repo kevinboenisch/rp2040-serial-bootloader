@@ -1,5 +1,7 @@
 #include "oled.h"
 
+#if OLED_ENABLED
+
 #include <stdint.h>
 #include "jpo/oled_driver.h"
 #include "oled_indicators.h"
@@ -13,20 +15,17 @@ static const uint8_t SYMBOL_FILL[] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff
 };
 
-#define WS(x,y,sym) oled_driver_write_symbol(&_oled_driver, (x), (y), (sym))
+#define WS(x,y,sym) oled_driver_write_symbol(_oled_driver, (x), (y), (sym))
 
-static OLED_VTable_Obj _oled_driver = {
-    .i2c_write = oled_i2c_write,
-    .inverted = false
-};
+static OLED_VTable _oled_driver = NULL;
 
 bool brain_render_oled()
 {
 #if OLED_INDICATORS_ENABLED
-    return indicators_render(&_oled_driver);
+    return indicators_render(_oled_driver);
 #else
     // normal case
-    return oled_driver_render(&_oled_driver);
+    return oled_driver_render(_oled_driver);
 #endif
 }
 
@@ -84,30 +83,30 @@ void draw_dino(int r, int c)
 void draw_big_b(int r, int c)
 {
     // Stylized large "B"
-    oled_driver_write_symbol(&_oled_driver, r, c, SYMBOL_FILL);
-    oled_driver_write_symbol(&_oled_driver, r, c+1, SYMBOL_FILL);
-    oled_driver_write_symbol(&_oled_driver, r, c+2, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c+1, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c+2, SYMBOL_FILL);
     r++;
-    oled_driver_write_symbol(&_oled_driver, r, c, SYMBOL_FILL);
-    oled_driver_write_symbol(&_oled_driver, r, c+3, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c+3, SYMBOL_FILL);
     r++;
-    oled_driver_write_symbol(&_oled_driver, r, c, SYMBOL_FILL);
-    oled_driver_write_symbol(&_oled_driver, r, c+1, SYMBOL_FILL);
-    oled_driver_write_symbol(&_oled_driver, r, c+2, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c+1, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c+2, SYMBOL_FILL);
     r++;
-    oled_driver_write_symbol(&_oled_driver, r, c, SYMBOL_FILL);
-    oled_driver_write_symbol(&_oled_driver, r, c+3, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c+3, SYMBOL_FILL);
     r++;
-    oled_driver_write_symbol(&_oled_driver, r, c, SYMBOL_FILL);
-    oled_driver_write_symbol(&_oled_driver, r, c+1, SYMBOL_FILL);
-    oled_driver_write_symbol(&_oled_driver, r, c+2, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c+1, SYMBOL_FILL);
+    oled_driver_write_symbol(_oled_driver, r, c+2, SYMBOL_FILL);
 }
 
 void draw_pattern()
 {
     for (int r = 0; r < 8; r++) {
         int c = r % 2;
-        oled_driver_write_symbol(&_oled_driver, r, c, SYMBOL_FILL);
+        oled_driver_write_symbol(_oled_driver, r, c, SYMBOL_FILL);
     }
 }
 
@@ -133,7 +132,7 @@ void oled_draw_progress_bar(int percent)
     brain_render_oled();
 }
 
-void oled_start()
+void oled_init(OLED_VTable oled_driver)
 {
     static bool oled_initialized = false;
     if (oled_initialized)
@@ -141,17 +140,22 @@ void oled_start()
         return;
     }
 
+    // Initialize the OLED driver
+    _oled_driver = oled_driver;
+    _oled_driver->i2c_write = oled_i2c_write;
+    _oled_driver->inverted = false;
+
     // Initialize main I2C bus.
     iic_init();
 
-    oled_driver_init(&_oled_driver);
+    oled_driver_init(_oled_driver);
 
 #if OLED_INDICATORS_ENABLED
     indicators_add();
 #endif
 
     oled_initialized = true;
-    oled_driver_clear(&_oled_driver);
+    oled_driver_clear(_oled_driver);
     
     draw_dino(2, 3);
     //draw_big_b(2, 3);
@@ -161,3 +165,4 @@ void oled_start()
     brain_render_oled();
 }
 
+#endif

@@ -41,7 +41,8 @@
         "string": "c",
         "system_error": "c",
         "typeinfo": "c",
-        "iic.h": "c"
+        "iic.h": "c",
+        "oled_indicators.h": "c"
     },
     "cmake.configureOnOpen": false
 }

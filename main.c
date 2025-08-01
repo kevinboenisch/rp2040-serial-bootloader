@@ -7,8 +7,10 @@
 #include <string.h>
 
 #include "version.h"
+#include "config.h"
 #include "core1.h"
 #include "oled.h"
+#include "oled_indicators.h"
 
 #include "RP2040.h"
 #include "pico/time.h"
@@ -34,14 +36,6 @@
 // Debug enable/disable
 #define T_BOOT 0 // "boot"
 #define T_TIME "time" // time output at the end of the bootloader. not much overhead, keep enabled.
-
-
-// Bootloader size. Must be 4k aligned. 
-// Was 12k originally. Make sure to match:
-// 1) danilom_bootloader/bootloader.ld
-// 2) jpo-software/resources/build_config/jpo_bootloadable.ld
-// 3) danilom_micropython/ports/rp2/jpo_memmap_mp.ld
-#define BOOTLOADER_SIZE_KB 60
 
 // The bootloader can be entered in three ways:
 //  - BOOTLOADER_ENTRY_PIN is low
@@ -413,6 +407,7 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 	uint32_t size = args_in[1];
 	uint32_t expected_crc = args_in[2];
 	uint32_t progress = args_in[3]; // 0-100
+	(void)progress; // unused if OLED_ENABLED is false
 
 	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: 0x% xsize: %d expected_crc:0x%x", addr, size, expected_crc);
 
@@ -450,8 +445,10 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 	
 	// return CRC of actual written data (NOT flash_sector_to_write)
 	resp_args_out[0] = calc_crc32((void *)addr, size);
-	
+
+#if OLED_ENABLED
 	oled_draw_progress_bar(progress);
+#endif
 
 	return RSP_OK;
 }
@@ -773,7 +770,6 @@ void disable_joystick_message_flood()
     // What do do with the rv?
 }
 
-
 int main(void)
 {
 	// Binary size optimization (keep buffers in RAM to save flash space)
@@ -781,6 +777,13 @@ int main(void)
 	// MUST BE IN main(), on top of the stack.
 	alignas(4) uint8_t stored_flash_sector[FLASH_SECTOR_SIZE] = {0};
 	core1_init_stored_flash_sector(stored_flash_sector);
+#if OLED_ENABLED
+	OLED_VTable_Obj oled_driver = {0};
+#endif
+#if OLED_INDICATORS_ENABLED
+	OLED_VTable_Obj indicators_driver = {0};
+#endif
+	// End optimization
 
 
 	gpio_init(BOOTLOADER_ENTRY_PIN);
@@ -803,7 +806,12 @@ int main(void)
 	jcomp_init();
 	jcomp_set_env_type("BOOT:" VERSION_TIMESTAMP);
 
-	oled_start();
+#if OLED_ENABLED
+	oled_init(&oled_driver);
+#endif
+#if OLED_INDICATORS_ENABLED
+	indicators_init(&indicators_driver);
+#endif
 
 	disable_joystick_message_flood();
 
