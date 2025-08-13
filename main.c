@@ -36,6 +36,7 @@
 // Debug enable/disable
 #define T_BOOT 0 // "boot"
 #define T_TIME "time" // time output at the end of the bootloader. not much overhead, keep enabled.
+#define T_BL_DEBUG "bl-debug"
 
 // The bootloader can be entered in three ways:
 //  - BOOTLOADER_ENTRY_PIN is low
@@ -401,6 +402,34 @@ static void do_write(uint32_t addr, uint32_t size, uint8_t* data_in)
 	_flash_total_ms += time_ms() - start_ms;
 }
 
+static bool reproBug303()
+{
+	static int count = 0;
+	if (count == 0) {
+		DBG_SEND(T_WARN, "Invoking reproBug303");
+		count++;
+
+		// Send a fake heartbeat message
+		uint8_t id = jcomp_get_next_cmd_id_bradio();
+		const int MSG_SIZE = 8 + 4 + 4;
+		JCOMP_CREATE_MSG(evt, JCOMP_MSG_TYPE_EVENT_NOACK, id, MSG_SIZE);
+		jcomp_msg_append_str(evt, "fHEART--");
+		// Not filling the data
+
+		JCOMP_RV rv = jcomp_send_msg(evt);
+		if (rv) {
+			DBG_SEND(T_ERROR, "Failed to send message: %d", rv);
+		}
+
+		return true;
+	}
+	else {
+		DBG_SEND(T_BL_DEBUG, "NOT invoking reproBug303 count:%d", count);
+		count++;
+		return false;
+	}
+}
+
 static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out)
 {
 	uint32_t addr = args_in[0];
@@ -409,6 +438,10 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 	uint32_t progress = args_in[3]; // 0-100
 	(void)progress; // unused if OLED_ENABLED is false
 
+	if (reproBug303()) {
+		DBG_SEND(T_WARN, "Repro Bug 303");
+		return RSP_NO_RESP;
+	}
 	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: 0x% xsize: %d expected_crc:0x%x", addr, size, expected_crc);
 
 	// Page data to write, 4k in size
@@ -705,14 +738,14 @@ static JCOMP_RV handle_data(struct cmd_context *ctx, uint8_t request_id)
 		ctx->status = RSP_OK;
 	}
 
-	size_t resp_len = sizeof(ctx->status) + (sizeof(*ctx->resp_args) * desc->resp_nargs) + ctx->resp_data_len;
-	memcpy(ctx->uart_buf, &ctx->status, sizeof(ctx->status));
-	
 	// Special case, no response
 	if (ctx->status == RSP_NO_RESP) {
 		return JCOMP_OK;
 	}
 
+	size_t resp_len = sizeof(ctx->status) + (sizeof(*ctx->resp_args) * desc->resp_nargs) + ctx->resp_data_len;
+	memcpy(ctx->uart_buf, &ctx->status, sizeof(ctx->status));
+	
 	// Send a response
 	JCOMP_RV err = send_response(request_id, ctx->uart_buf, resp_len);
 	return err;
