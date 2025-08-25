@@ -157,12 +157,29 @@ void oled_init(OLED_VTable oled_driver)
     oled_initialized = true;
     oled_driver_clear(_oled_driver);
     
+    //oled_driver_printf(_oled_driver, 0, 0, "Bootloader");
+
     draw_dino(2, 3);
     //draw_big_b(2, 3);
     //draw_pattern();
     //draw_progress_bar(0);
 
     brain_render_oled();
+}
+
+void oled_clear()
+{
+    oled_driver_clear(_oled_driver);
+#if OLED_INDICATORS_ENABLED
+    indicators_unregister_all();
+#endif
+
+    // Maybe use a nicer symbol.
+    // It doesn't mean much, just that the bootloader has exited.
+    // Don't use it to imply much else is happening.
+    WS(0, 0, SYMBOL_FILL);
+
+    brain_render_oled();    
 }
 
 #endif

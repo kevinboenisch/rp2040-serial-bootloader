@@ -803,6 +803,10 @@ int main(void)
 
 	init_serial();
 
+#if OLED_ENABLED
+	jcomp_core1_run_before_reboot_fn = oled_clear;
+#endif
+
 	jcomp_init();
 	jcomp_set_env_type("BOOT:" VERSION_TIMESTAMP);
 

@@ -10,4 +10,6 @@
 
 void oled_init(OLED_VTable oled_driver);
 void oled_draw_progress_bar(int percent);
+void oled_clear();
+
 #endif

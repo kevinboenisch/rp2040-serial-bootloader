@@ -75,4 +75,9 @@ void indicators_init(OLED_VTable indicators_driver)
     _indicators_driver->inverted = true;
 }
 
+void indicators_unregister_all()
+{
+    oled_indicators_unregister_all();
+}
+
 #endif
