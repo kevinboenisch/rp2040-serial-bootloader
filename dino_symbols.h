@@ -1,6 +1,11 @@
 #pragma once
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 static const uint8_t SYMBOL_DINO_0_0[] = {
     0x00, 0x18, 0x1c, 0x1c, 0x1e, 0x0e, 0x0f, 0x0f
 };
@@ -72,3 +77,6 @@ static const uint8_t SYMBOL_DINO_5_3[] = {
     0x80, 0xe1, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+#ifdef __cplusplus
+}
+#endif
