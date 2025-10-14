@@ -125,7 +125,7 @@ target_link_libraries(jpo_bootloader
                       hardware_structs
                       hardware_resets
                       cmsis_core
-					  jpo_jcomp
+					  jpo_jcomp_brain
 					  jpo_jcomp_protocol
 					  # optional, for oled and indicators
 					  hardware_i2c
