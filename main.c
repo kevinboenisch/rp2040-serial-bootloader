@@ -33,6 +33,12 @@
 
 #include "stdalign.h"
 
+// Test write delay. Write command runs in parallel with
+// store, so this could affect timing.
+#define TEST_WRITE_DELAY_MS 0
+#define TEST_CORRUPT_BEFORE_VERIFY 0 // Set to >=2... not 1
+#define TEST_CORRUPT_AFTER_VERIFY  0 // Set to >=2... not 1
+
 // Debug enable/disable
 #define T_BOOT 0 // "boot"
 #define T_TIME "time" // time output at the end of the bootloader. not much overhead, keep enabled.
@@ -53,7 +59,8 @@
 #define CMD_CRC    (('C' << 0) | ('R' << 8) | ('C' << 16) | ('C' << 24))
 #define CMD_ERASE  (('E' << 0) | ('R' << 8) | ('A' << 16) | ('S' << 24))
 #define CMD_STORE  (('S' << 0) | ('T' << 8) | ('O' << 16) | ('R' << 24)) // jpo
-#define CMD_CEWR   (('C' << 0) | ('E' << 8) | ('W' << 16) | ('R' << 24)) // jpo
+#define CMD_COPY_STORED (('C' << 0) | ('P' << 8) | ('S' << 16) | ('T' << 24)) // jpo
+#define CMD_ERASE_WRITE (('E' << 0) | ('R' << 8) | ('W' << 16) | ('R' << 24)) // jpo
 #define CMD_SEAL   (('S' << 0) | ('E' << 8) | ('A' << 16) | ('L' << 24))
 #define CMD_GO     (('G' << 0) | ('O' << 8) | ('G' << 16) | ('O' << 24))
 #define CMD_INFO   (('I' << 0) | ('N' << 8) | ('F' << 16) | ('O' << 24))
@@ -77,6 +84,10 @@
 
 // Perf improvement: noack support
 static bool _last_msg_noack = false;
+
+// Page data to write, 4k in size
+// Optimization: initialize in main() to keep it in RAM (top of the stack) instead of the binary (flash)
+static uint8_t* _write_flash_sector = NULL;
 
 // Perf measurement
 static uint32_t _start_ms = 0;
@@ -127,7 +138,8 @@ static uint32_t handle_csum(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_
 static uint32_t size_crc(uint32_t *args_in, uint32_t *data_len_out, uint32_t *resp_data_len_out);
 static uint32_t handle_crc(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t handle_erase(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
-static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
+static uint32_t handle_copyStoredPage(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
+static uint32_t handle_eraseWritePage(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t handle_seal(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t handle_go(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
 static uint32_t handle_info(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out);
@@ -187,15 +199,23 @@ const struct command_desc cmds[] = {
 		.handle = NULL,
 	},
 	{
-		// CEWR addr len crc (of the stored buffer) progress (0-100)
-		// OKOK crc (of the written page)
-		// CRC! if in-memory data does not match the CRC
-		// ERR! if erase fails
-		.opcode = CMD_CEWR,
-		.nargs = 4,
+		// CPST
+		// OKOK crc (of the in-memory page to be written)
+		.opcode = CMD_COPY_STORED,
+		.nargs = 0,
 		.resp_nargs = 1,
 		.size = NULL,
-		.handle = &handle_copyEraseWrite,
+		.handle = &handle_copyStoredPage,
+	},
+	{
+		// ERWR addr len progress (0-100)
+		// OKOK crc (of the written page)
+		// ERR! if erase fails
+		.opcode = CMD_ERASE_WRITE,
+		.nargs = 3,
+		.resp_nargs = 1,
+		.size = NULL,
+		.handle = &handle_eraseWritePage,
 	},
 	{
 		// SEAL vtor len crc
@@ -401,31 +421,58 @@ static void do_write(uint32_t addr, uint32_t size, uint8_t* data_in)
 	_flash_total_ms += time_ms() - start_ms;
 }
 
-static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out)
+static uint32_t handle_copyStoredPage(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out)
+{	
+	// Safely copy the stored data
+	copy_stored_flash_sector(_write_flash_sector);
+
+#if TEST_CORRUPT_BEFORE_VERIFY >= 2
+	static int tbv_counter = 0;
+	if (tbv_counter % TEST_CORRUPT_BEFORE_VERIFY == 0 
+		|| tbv_counter % TEST_CORRUPT_BEFORE_VERIFY == 1) {
+		_write_flash_sector[0] ^= 0x88;
+		DBG_SEND(T_WARN, "handle_copyStoredPage: introducing data corruption before verify for testing");
+	}
+	tbv_counter++;
+#endif
+
+	// Return the CRC of stored data that was copied (and is about to be written)
+	uint32_t mem_crc = calc_crc32(_write_flash_sector, FLASH_SECTOR_SIZE);
+	resp_args_out[0] = mem_crc;	
+
+#if TEST_CORRUPT_AFTER_VERIFY >= 2
+	static int tav_counter = 0;
+	if (tav_counter % TEST_CORRUPT_AFTER_VERIFY == 0
+		|| tav_counter % TEST_CORRUPT_AFTER_VERIFY == 1) {
+		_write_flash_sector[0] ^= 0x88;
+		DBG_SEND(T_WARN, "handle_copyStoredPage: introducing data corruption after verify for testing");
+	}
+	tav_counter++;
+#endif
+
+	return RSP_OK;
+}
+
+static uint32_t handle_eraseWritePage(uint32_t *args_in, uint8_t *data_in, uint32_t *resp_args_out, uint8_t *resp_data_out)
 {
+	// Erases the page and writes data copied by copyStoredPage. 
+	// Assumes that data is correct. 
 	uint32_t addr = args_in[0];
 	uint32_t size = args_in[1];
-	uint32_t expected_crc = args_in[2];
-	uint32_t progress = args_in[3]; // 0-100
+	uint32_t progress = args_in[2]; // 0-100
 	(void)progress; // unused if OLED_ENABLED is false
 
-	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: 0x% xsize: %d expected_crc:0x%x", addr, size, expected_crc);
+	//DBG_SEND(T_BOOT, "handle_eraseWritePage addr: 0x% size: %d progress:%d", addr, size, progress);
 
-	// Page data to write, 4k in size
-	alignas(4) uint8_t flash_sector_to_write[FLASH_SECTOR_SIZE] = {0};
-	copy_stored_flash_sector(flash_sector_to_write);
+	// Bug repro: delay before copy (as this is an async fn)
+#if TEST_WRITE_DELAY_MS
+	sleep_ms(TEST_WRITE_DELAY_MS);
+#endif
 
-	// Verify the CRC of the in-memory data (flash_sector to write)
-	uint32_t mem_crc = calc_crc32(flash_sector_to_write, FLASH_SECTOR_SIZE);
-	if (mem_crc != expected_crc) {
-		DBG_SEND(T_WARN, "handle_copyEraseWrite addr: 0x%x size: %d expected_crc:0x%x != mem_crc:0x%x", addr, size, expected_crc, mem_crc);
-		return RSP_ERR_CRC;
-	}
-
-	//DBG_SEND(T_BOOT, "cewr: do_erase addr: %d size: %d", addr, size);
+	//DBG_SEND(T_BOOT, "erwr do_erase addr: %d size: %d", addr, size);
 	uint32_t resp = do_erase(addr, size);
 	if (resp != RSP_OK) {
-		DBG_SEND(T_ERROR, "handle_copyEraseWrite addr: 0x%x size: %d, erase failed.", addr, size);
+		DBG_SEND(T_ERROR, "handle_eraseWritePage addr: 0x%x size: %d, erase failed.", addr, size);
 		return resp;
 	}
 
@@ -437,8 +484,8 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 			write_size = size - offset;
 		}
 
-		//DBG_SEND(T_BOOT, "cewr write: addr: %d size: %d offset: %d", addr, write_size, offset);
-		do_write(addr + offset, write_size, flash_sector_to_write + offset);
+		//DBG_SEND(T_BOOT, "erwr do_write: addr: %d size: %d offset: %d", addr, write_size, offset);
+		do_write(addr + offset, write_size, _write_flash_sector + offset);
 
 		offset += write_size;
 	}
@@ -777,6 +824,10 @@ int main(void)
 	// MUST BE IN main(), on top of the stack.
 	alignas(4) uint8_t stored_flash_sector[FLASH_SECTOR_SIZE] = {0};
 	core1_init_stored_flash_sector(stored_flash_sector);
+
+	alignas(4) uint8_t write_flash_sector[FLASH_SECTOR_SIZE] = {0};
+	_write_flash_sector = write_flash_sector;
+
 #if OLED_ENABLED
 	OLED_VTable_Obj oled_driver = {0};
 #endif

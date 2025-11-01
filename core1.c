@@ -16,7 +16,7 @@
 // Mutex
 auto_init_mutex(_state_mutex);
 
-// Page data to write, 4k in size
+// Page data to store for writing, 4k in size
 // Optimization: initialize in main() to keep it in RAM (top of the stack) instead of the binary (flash)
 static uint8_t* _stored_flash_sector = NULL;
 
