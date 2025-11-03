@@ -71,7 +71,7 @@ add_executable(jpo_bootloader
 ###### JPO additions
 # Enable usb output, disable uart output
 pico_enable_stdio_usb(jpo_bootloader 1)
-# pico_enable_stdio_uart(jpo_bootloader 0)
+pico_enable_stdio_uart(jpo_bootloader 0)
 
 ### Prerequisites
 set(TO_FIX "To fix, (re)install the JPO tools.")

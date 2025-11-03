@@ -177,15 +177,16 @@ const struct command_desc cmds[] = {
 		.size = NULL,
 		.handle = &handle_erase,
 	},
-	{
-		// STOR addr len [data]
-		// OKOK crc (of the 4k storage buffer)
-		.opcode = CMD_STORE,
-		.nargs = 2,
-		.resp_nargs = 1,
-		.size = NULL,
-		.handle = NULL,
-	},
+	// Handled on core1
+	// {
+	// 	// STOR addr len [data]
+	// 	// OKOK crc (of the 4k storage buffer)
+	// 	.opcode = CMD_STORE,
+	// 	.nargs = 2,
+	// 	.resp_nargs = 1,
+	// 	.size = NULL,
+	// 	.handle = NULL,
+	// },
 	{
 		// CEWR addr len crc (of the stored buffer) progress (0-100)
 		// OKOK crc (of the written page)
