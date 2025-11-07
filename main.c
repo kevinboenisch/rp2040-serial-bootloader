@@ -412,6 +412,15 @@ static uint32_t handle_copyEraseWrite(uint32_t *args_in, uint8_t *data_in, uint3
 
 	//DBG_SEND(T_BOOT, "handle_copyEraseWrite addr: 0x% xsize: %d expected_crc:0x%x", addr, size, expected_crc);
 
+    // WARNING: there's a race condition here. 
+    // Flasher initiates a CEWR of page 1 first, and then STOR of page n+1.
+	// If the Bootloader is doing CEWR:n on core0, but core1 does a STOR:n+1 before it copies the page, there's a CRC error.
+	// Proper fix with a separate, acked copy/verify command causes a major performance hit (~9 to 13 sec).
+
+	// Therefore, we prefer Bootloader to return an occasional CRC error. The flasher should handle this by storing and 
+    // writing the page *sequentially* (not in parallel). First, send all STOR:n, then CEWR:n, wait for it to end, 
+    // retry a few times if needed, then continue normally. 
+	
 	// Page data to write, 4k in size
 	alignas(4) uint8_t flash_sector_to_write[FLASH_SECTOR_SIZE] = {0};
 	copy_stored_flash_sector(flash_sector_to_write);
