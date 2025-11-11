@@ -37,7 +37,6 @@ void indicators_add()
 
     oled_indicator_register(oi_draw_radio_status_w1, 1);
     oled_indicator_register(oi_draw_usbhost_status_w1, 1);
-    oled_indicator_register(oi_draw_rs485_status_w1, 1);
     // Skip the redraw counter
 
     // Add a callback to update them from core1
